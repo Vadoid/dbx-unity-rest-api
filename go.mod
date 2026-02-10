@@ -1,6 +1,6 @@
 module dbx-explore
 
-go 1.24.8
+go 1.21
 
 require (
 	github.com/databricks/databricks-sdk-go v0.106.0
