@@ -1,0 +1,23 @@
+# Binaries
+dbx-explore
+dbx-explore.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment variables
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MacOS
+.DS_Store
+
+# Go
+vendor/
