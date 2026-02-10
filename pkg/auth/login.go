@@ -28,7 +28,7 @@ func RunInteractiveLogin() error {
 	// 2. Open Browser
 	// The path /#setting/account usually lands on User Settings.
 	// Deep linking to tokens is flaky.
-	tokenURL := fmt.Sprintf("%s/#setting/account", host)
+	tokenURL := fmt.Sprintf("%s/settings/user/developer/access-tokens", host)
 
 	ui.PrintInfo("👉 Action Required: Visit your User Settings to generate a new token.")
 	ui.PrintInfo(fmt.Sprintf("🔗 Link: %s", tokenURL))
