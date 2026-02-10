@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 
 	"dbx-explore/pkg/ui"
@@ -31,10 +29,9 @@ func RunInteractiveLogin() error {
 	// The path /#setting/account usually lands on User Settings.
 	// Deep linking to tokens is flaky.
 	tokenURL := fmt.Sprintf("%s/#setting/account", host)
-	ui.PrintInfo("Opening browser to 'User Settings'...")
-	ui.PrintInfo("👉 Action Required: Click on the 'Developer' tab (or 'Access tokens') to generate a new token.")
-	ui.PrintInfo(fmt.Sprintf("Link: %s", tokenURL))
-	openBrowser(tokenURL)
+
+	ui.PrintInfo("👉 Action Required: Visit your User Settings to generate a new token.")
+	ui.PrintInfo(fmt.Sprintf("🔗 Link: %s", tokenURL))
 
 	// 3. Get Token
 	fmt.Print("Enter your Personal Access Token: ")
@@ -102,22 +99,7 @@ func RunInteractiveLogin() error {
 	return nil
 }
 
-func openBrowser(url string) {
-	var err error
-	switch runtime.GOOS {
-	case "linux":
-		err = exec.Command("xdg-open", url).Start()
-	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	case "darwin":
-		err = exec.Command("open", url).Start()
-	default:
-		err = fmt.Errorf("unsupported platform")
-	}
-	if err != nil {
-		ui.PrintError(fmt.Sprintf("Could not open browser: %v", err))
-	}
-}
+
 
 // ClearCredentials removes the .env file and unsets environment variables.
 func ClearCredentials() error {
