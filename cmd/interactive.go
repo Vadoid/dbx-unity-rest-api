@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"dbx-explore/pkg/auth"
+	pkgcatalog "dbx-explore/pkg/catalog"
 	"dbx-explore/pkg/ui"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -34,10 +35,12 @@ func startInteractiveJourney() {
 		// Check if we have credentials
 		hasCreds := os.Getenv("DATABRICKS_HOST") != "" && os.Getenv("DATABRICKS_TOKEN") != ""
 
-		menuItems := []string{"🚀 Start Exploration"}
+		menuItems := []string{"📂 Data Explorer"}
 		if hasCreds {
 			host := os.Getenv("DATABRICKS_HOST")
 			ui.PrintInfo(fmt.Sprintf("Logged in as: %s", host))
+			menuItems = append(menuItems, "🔌 Federation (Connections)")
+			menuItems = append(menuItems, "🏗️ Infrastructure")
 			menuItems = append(menuItems, "🔄 Reset Credentials / Login")
 			// Show current warehouse if selected, or option to select
 			warehouseID := os.Getenv("DATABRICKS_WAREHOUSE_ID")
@@ -77,7 +80,17 @@ func startInteractiveJourney() {
 			continue
 		}
 
-		// Start Exploration
+		if choice == "🔌 Federation (Connections)" {
+			navigateFederation()
+			continue
+		}
+
+		if choice == "🏗️ Infrastructure" {
+			navigateInfrastructure()
+			continue
+		}
+
+		// Start Exploration (Data Explorer)
 		// 0. Check Auth (Double check)
 		if os.Getenv("DATABRICKS_HOST") == "" || os.Getenv("DATABRICKS_TOKEN") == "" {
 			ui.PrintInfo("No credentials found. Starting interactive login...")
@@ -233,8 +246,38 @@ func navigateSchemas(ctx context.Context, w *databricks.WorkspaceClient, catalog
 		}
 		ui.PrintSuccess(fmt.Sprintf("Selected Schema: %s", selectedSchema))
 
-		// Loop for Table Selection
-		navigateTables(ctx, w, catalogName, selectedSchema)
+		// Loop for Object Selection
+		navigateObjects(ctx, w, catalogName, selectedSchema)
+	}
+}
+
+func navigateObjects(ctx context.Context, w *databricks.WorkspaceClient, catalogName, schemaName string) {
+	for {
+		objectTypes := []string{
+			"📋 Tables & Views",
+			"📦 Volumes",
+			"𝑓  Functions",
+			"🤖 Models (Registered)",
+			"⬅️  Back to Schemas",
+		}
+
+		_, choice, err := ui.SelectPrompt(fmt.Sprintf("Select Object Type (%s.%s)", catalogName, schemaName), objectTypes)
+		if err != nil {
+			return
+		}
+
+		switch choice {
+		case "📋 Tables & Views":
+			navigateTables(ctx, w, catalogName, schemaName)
+		case "📦 Volumes":
+			navigateVolumes(ctx, w, catalogName, schemaName)
+		case "𝑓  Functions":
+			navigateFunctions(ctx, w, catalogName, schemaName)
+		case "🤖 Models (Registered)":
+			navigateModels(ctx, w, catalogName, schemaName)
+		case "⬅️  Back to Schemas":
+			return
+		}
 	}
 }
 
@@ -282,6 +325,7 @@ func navigateTableActions(ctx context.Context, w *databricks.WorkspaceClient, ca
 			"📋 View Columns",
 			"ℹ️  Extended Metadata",
 			"📊 Sample Data (Limit 5)",
+			"🛡️ View Permissions",
 			"⬅️  Back to Tables",
 		}
 
@@ -297,6 +341,8 @@ func navigateTableActions(ctx context.Context, w *databricks.WorkspaceClient, ca
 			showExtendedMetadata(ctx, w, catalogName, schemaName, tableName)
 		case "📊 Sample Data (Limit 5)":
 			sampleData(ctx, catalogName, schemaName, tableName)
+		case "🛡️ View Permissions":
+			showPermissions(ctx, w, "TABLE", fmt.Sprintf("%s.%s.%s", catalogName, schemaName, tableName))
 		case "⬅️  Back to Tables":
 			return
 		}
@@ -413,4 +459,396 @@ func sampleData(ctx context.Context, c, s, t string) {
 	// Process rows
 	// DataArray is [][]string
 	ui.PrintTable(headers, resp.Result.DataArray)
+}
+
+func navigateFederation() {
+	ctx := context.Background()
+	w := getWorkspaceClient()
+
+	for {
+		ui.PrintHeader("Federation (Connections)")
+		conns, err := pkgcatalog.ListConnections(ctx, w)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to list connections: %v", err))
+			return
+		}
+
+		if len(conns) == 0 {
+			ui.PrintInfo("No connections found.")
+			return
+		}
+
+		items := make([]string, len(conns)+1)
+		for i, c := range conns {
+			items[i] = fmt.Sprintf("%s (%s)", c.Name, c.ConnectionType)
+		}
+		items[len(conns)] = "⬅️  Back to Main Menu"
+
+		idx, choice, err := ui.SelectPrompt("Select Connection", items)
+		if err != nil || choice == "⬅️  Back to Main Menu" {
+			return
+		}
+
+		selected := conns[idx]
+		ui.PrintKeyValue("Connection Details", map[string]string{
+			"Name":      selected.Name,
+			"Type":      string(selected.ConnectionType),
+			"Owner":     selected.Owner,
+			"Created":   fmt.Sprintf("%d", selected.CreatedAt),
+			"Comment":   selected.Comment,
+			"Url":       selected.Url,
+			"Metastore": selected.MetastoreId,
+		})
+		fmt.Println("\nPress Enter to continue...")
+		fmt.Scanln()
+	}
+}
+
+func navigateInfrastructure() {
+	ctx := context.Background()
+	w := getWorkspaceClient()
+
+	for {
+		items := []string{
+			"🏗️ Metastore Summary",
+			"📦 External Locations",
+			"🔑 Storage Credentials",
+			"⬅️  Back to Main Menu",
+		}
+
+		_, choice, err := ui.SelectPrompt("Infrastructure", items)
+		if err != nil || choice == "⬅️  Back to Main Menu" {
+			return
+		}
+
+		switch choice {
+		case "🏗️ Metastore Summary":
+			showMetastoreSummary(ctx, w)
+		case "📦 External Locations":
+			listExternalLocations(ctx, w)
+		case "🔑 Storage Credentials":
+			listStorageCredentials(ctx, w)
+		}
+	}
+}
+
+func showMetastoreSummary(ctx context.Context, w *databricks.WorkspaceClient) {
+	summary, err := pkgcatalog.GetMetastoreSummary(ctx, w)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to get metastore summary: %v", err))
+		return
+	}
+
+	ui.PrintHeader("Metastore Summary")
+	ui.PrintKeyValue("Metastore Details", map[string]string{
+		"Name":           summary.Name,
+		"StorageRoot":    summary.StorageRoot,
+		"Owner":          summary.Owner,
+		"Region":         summary.Region,
+		"Cloud":          summary.Cloud,
+		"GlobalMetastoreId": summary.GlobalMetastoreId,
+		"MetastoreId":    summary.MetastoreId,
+	})
+	fmt.Println("\nPress Enter to continue...")
+	fmt.Scanln()
+}
+
+func listExternalLocations(ctx context.Context, w *databricks.WorkspaceClient) {
+	locs, err := pkgcatalog.ListExternalLocations(ctx, w)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to list external locations: %v", err))
+		return
+	}
+
+	if len(locs) == 0 {
+		ui.PrintInfo("No external locations found.")
+		return
+	}
+
+	items := make([]string, len(locs)+1)
+	for i, l := range locs {
+		items[i] = l.Name
+	}
+	items[len(locs)] = "⬅️  Back"
+
+	idx, choice, err := ui.SelectPrompt("Select External Location", items)
+	if err != nil || choice == "⬅️  Back" {
+		return
+	}
+
+	selected := locs[idx]
+	ui.PrintKeyValue("External Location Details", map[string]string{
+		"Name":           selected.Name,
+		"Url":            selected.Url,
+		"Owner":          selected.Owner,
+		"Credential":     selected.CredentialName,
+		"ReadOnly":       fmt.Sprintf("%v", selected.ReadOnly),
+		"CreatedAt":      fmt.Sprintf("%d", selected.CreatedAt),
+	})
+	fmt.Println("\nPress Enter to continue...")
+	fmt.Scanln()
+}
+
+func listStorageCredentials(ctx context.Context, w *databricks.WorkspaceClient) {
+	creds, err := pkgcatalog.ListStorageCredentials(ctx, w)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to list storage credentials: %v", err))
+		return
+	}
+
+	if len(creds) == 0 {
+		ui.PrintInfo("No storage credentials found.")
+		return
+	}
+
+	items := make([]string, len(creds)+1)
+	for i, c := range creds {
+		items[i] = c.Name
+	}
+	items[len(creds)] = "⬅️  Back"
+
+	idx, choice, err := ui.SelectPrompt("Select Credential", items)
+	if err != nil || choice == "⬅️  Back" {
+		return
+	}
+
+	selected := creds[idx]
+	ui.PrintKeyValue("Storage Credential Details", map[string]string{
+		"Name":      selected.Name,
+		"Owner":     selected.Owner,
+		"CreatedAt": fmt.Sprintf("%d", selected.CreatedAt),
+	})
+	fmt.Println("\nPress Enter to continue...")
+	fmt.Scanln()
+}
+
+func showPermissions(ctx context.Context, w *databricks.WorkspaceClient, securableType, fullName string) {
+	ui.PrintInfo(fmt.Sprintf("Fetching permissions for %s (%s)...", fullName, securableType))
+	perms, err := pkgcatalog.GetEffectivePermissions(ctx, w, securableType, fullName)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to get permissions: %v", err))
+		return
+	}
+
+	if len(perms.PrivilegeAssignments) == 0 {
+		ui.PrintInfo("No permissions found.")
+		fmt.Println("\nPress Enter to continue...")
+		fmt.Scanln()
+		return
+	}
+
+	var rows [][]string
+	for _, p := range perms.PrivilegeAssignments {
+		for _, priv := range p.Privileges {
+			inheritedFrom := "Direct"
+			if priv.InheritedFromType != "" {
+				inheritedFrom = fmt.Sprintf("%s (%s)", priv.InheritedFromType, priv.InheritedFromName)
+			}
+			rows = append(rows, []string{p.Principal, string(priv.Privilege), inheritedFrom})
+		}
+	}
+
+	ui.PrintTable([]string{"Principal", "Privilege", "Inherited From"}, rows)
+	fmt.Println("\nPress Enter to continue...")
+	fmt.Scanln()
+}
+
+func navigateVolumes(ctx context.Context, w *databricks.WorkspaceClient, catalogName, schemaName string) {
+	for {
+		vols, err := pkgcatalog.ListVolumes(ctx, w, catalogName, schemaName)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to list volumes: %v", err))
+			return
+		}
+
+		if len(vols) == 0 {
+			ui.PrintInfo("No volumes found.")
+			return
+		}
+
+		items := make([]string, len(vols)+1)
+		for i, v := range vols {
+			items[i] = fmt.Sprintf("%s (%s)", v.Name, v.VolumeType)
+		}
+		items[len(vols)] = "⬅️  Back"
+
+		idx, choice, err := ui.SelectPrompt("Select Volume", items)
+		if err != nil || choice == "⬅️  Back" {
+			return
+		}
+
+		selected := vols[idx]
+		navigateVolumeActions(ctx, w, selected)
+	}
+}
+
+func navigateVolumeActions(ctx context.Context, w *databricks.WorkspaceClient, vol catalog.VolumeInfo) {
+	for {
+		ui.PrintHeader(fmt.Sprintf("Volume: %s", vol.Name))
+		actions := []string{
+			"📄 View Details",
+			"🛡️ View Permissions",
+			"⬅️  Back to Volumes",
+		}
+
+		_, choice, err := ui.SelectPrompt("Choose Action", actions)
+		if err != nil {
+			return
+		}
+
+		switch choice {
+		case "📄 View Details":
+			ui.PrintKeyValue("Volume Details", map[string]string{
+				"Name":            vol.Name,
+				"Type":            string(vol.VolumeType),
+				"Owner":           vol.Owner,
+				"StorageLocation": vol.StorageLocation,
+				"Comment":         vol.Comment,
+			})
+			fmt.Println("\nPress Enter to continue...")
+			fmt.Scanln()
+		case "🛡️ View Permissions":
+			showPermissions(ctx, w, "VOLUME", vol.FullName)
+		case "⬅️  Back to Volumes":
+			return
+		}
+	}
+}
+
+func navigateFunctions(ctx context.Context, w *databricks.WorkspaceClient, catalogName, schemaName string) {
+	for {
+		funcs, err := pkgcatalog.ListFunctions(ctx, w, catalogName, schemaName)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to list functions: %v", err))
+			return
+		}
+
+		if len(funcs) == 0 {
+			ui.PrintInfo("No functions found.")
+			return
+		}
+
+		items := make([]string, len(funcs)+1)
+		for i, f := range funcs {
+			items[i] = fmt.Sprintf("%s", f.Name)
+		}
+		items[len(funcs)] = "⬅️  Back"
+
+		idx, choice, err := ui.SelectPrompt("Select Function", items)
+		if err != nil || choice == "⬅️  Back" {
+			return
+		}
+
+		selected := funcs[idx]
+		// Fetch full details including routine definition
+		fullFunc, err := pkgcatalog.GetFunction(ctx, w, selected.FullName)
+		if err == nil {
+			selected = *fullFunc
+		}
+
+		navigateFunctionActions(ctx, w, selected)
+	}
+}
+
+func navigateFunctionActions(ctx context.Context, w *databricks.WorkspaceClient, fn catalog.FunctionInfo) {
+	for {
+		ui.PrintHeader(fmt.Sprintf("Function: %s", fn.Name))
+		actions := []string{
+			"📄 View Details",
+			"🛡️ View Permissions",
+			"⬅️  Back to Functions",
+		}
+
+		_, choice, err := ui.SelectPrompt("Choose Action", actions)
+		if err != nil {
+			return
+		}
+
+		switch choice {
+		case "📄 View Details":
+			ui.PrintKeyValue("Function Details", map[string]string{
+				"Name":            fn.Name,
+				"DataType":        string(fn.DataType),
+				"Owner":           fn.Owner,
+				"RoutineBody":     string(fn.RoutineBody),
+				"IsDeterministic": fmt.Sprintf("%v", fn.IsDeterministic),
+				"Comment":         fn.Comment,
+			})
+
+			if fn.RoutineDefinition != "" {
+				fmt.Println("\n📜 Routine Definition:")
+				fmt.Println("--------------------------------------------------")
+				fmt.Println(fn.RoutineDefinition)
+				fmt.Println("--------------------------------------------------")
+			}
+			fmt.Println("\nPress Enter to continue...")
+			fmt.Scanln()
+		case "🛡️ View Permissions":
+			showPermissions(ctx, w, "FUNCTION", fn.FullName)
+		case "⬅️  Back to Functions":
+			return
+		}
+	}
+}
+
+func navigateModels(ctx context.Context, w *databricks.WorkspaceClient, catalogName, schemaName string) {
+	for {
+		models, err := pkgcatalog.ListModels(ctx, w, catalogName, schemaName)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to list models: %v", err))
+			return
+		}
+
+		if len(models) == 0 {
+			ui.PrintInfo("No models found.")
+			return
+		}
+
+		items := make([]string, len(models)+1)
+		for i, m := range models {
+			items[i] = m.Name
+		}
+		items[len(models)] = "⬅️  Back"
+
+		idx, choice, err := ui.SelectPrompt("Select Model", items)
+		if err != nil || choice == "⬅️  Back" {
+			return
+		}
+
+		selected := models[idx]
+		navigateModelActions(ctx, w, selected)
+	}
+}
+
+func navigateModelActions(ctx context.Context, w *databricks.WorkspaceClient, model catalog.RegisteredModelInfo) {
+	for {
+		ui.PrintHeader(fmt.Sprintf("Model: %s", model.Name))
+		actions := []string{
+			"📄 View Details",
+			"🛡️ View Permissions",
+			"⬅️  Back to Models",
+		}
+
+		_, choice, err := ui.SelectPrompt("Choose Action", actions)
+		if err != nil {
+			return
+		}
+
+		switch choice {
+		case "📄 View Details":
+			ui.PrintKeyValue("Model Details", map[string]string{
+				"Name":      model.Name,
+				"Owner":     model.Owner,
+				"Comment":   model.Comment,
+				"CreatedAt": fmt.Sprintf("%d", model.CreatedAt),
+				"UpdatedAt": fmt.Sprintf("%d", model.UpdatedAt),
+			})
+			fmt.Println("\nPress Enter to continue...")
+			fmt.Scanln()
+		case "🛡️ View Permissions":
+			showPermissions(ctx, w, "FUNCTION", model.FullName) // Models are securable type FUNCTION in SDK? Need to check.
+		case "⬅️  Back to Models":
+			return
+		}
+	}
 }

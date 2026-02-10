@@ -1,5 +1,8 @@
 # 🌌 Databricks Unity Catalog Explorer (dbx-explore)
 
+![CI](https://github.com/your-repo/dbx-explore/actions/workflows/ci.yml/badge.svg)
+
+
 A powerful, interactive CLI tool for exploring Databricks Unity Catalog metadata and data. Built with Go and the official Databricks SDK, it offers a seamless "Wizard Mode" to navigate your data assets without writing SQL.
 
 ## Features
@@ -37,6 +40,12 @@ go mod tidy
 # 3. Build the binary
 go build -o dbx-explore
 ```
+### Pre-built Binaries
+We automatically build binaries for every release. Check the [Actions](https://github.com/your-repo/dbx-explore/actions) tab for the latest artifacts:
+- **Linux**: `dbx-uc-linux-amd64`
+- **macOS (Intel)**: `dbx-uc-darwin-amd64`
+- **macOS (Apple Silicon)**: `dbx-uc-darwin-arm64`
+- **Windows**: `dbx-uc-windows-amd64.exe`
 
 ## Usage
 
