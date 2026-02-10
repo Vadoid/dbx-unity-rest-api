@@ -2,6 +2,7 @@
 
 ![CI](https://github.com/Vadoid/dbx-unity-rest-api/actions/workflows/ci.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/Vadoid/dbx-unity-rest-api)
+
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Vadoid/dbx-unity-rest-api)
 
 
