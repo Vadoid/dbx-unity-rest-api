@@ -35,8 +35,9 @@ func startInteractiveJourney() {
 		// Check if we have credentials
 		hasCreds := os.Getenv("DATABRICKS_HOST") != "" && os.Getenv("DATABRICKS_TOKEN") != ""
 
-		menuItems := []string{"📂 Data Explorer"}
+		var menuItems []string
 		if hasCreds {
+			menuItems = append(menuItems, "📂 Data Explorer")
 			host := os.Getenv("DATABRICKS_HOST")
 			ui.PrintInfo(fmt.Sprintf("Logged in as: %s", host))
 			menuItems = append(menuItems, "🔌 Federation (Connections)")
@@ -51,6 +52,7 @@ func startInteractiveJourney() {
 			}
 		} else {
 			ui.PrintInfo("Status: Not Logged In")
+			menuItems = append(menuItems, "🔑 Login")
 		}
 		menuItems = append(menuItems, "❌ Exit")
 
@@ -64,9 +66,11 @@ func startInteractiveJourney() {
 			return
 		}
 
-		if choice == "🔄 Reset Credentials / Login" {
-			if err := auth.ClearCredentials(); err != nil {
-				ui.PrintError(fmt.Sprintf("Failed to clear credentials: %v", err))
+		if choice == "🔄 Reset Credentials / Login" || choice == "🔑 Login" {
+			if choice == "🔄 Reset Credentials / Login" {
+				if err := auth.ClearCredentials(); err != nil {
+					ui.PrintError(fmt.Sprintf("Failed to clear credentials: %v", err))
+				}
 			}
 			// Trigger login immediately
 			if err := auth.RunInteractiveLogin(); err != nil {
