@@ -11,7 +11,7 @@ A powerful, interactive CLI tool for exploring Databricks Unity Catalog metadata
 ## Features
 
 - **Interactive "Wizard" Mode**: Navigate Catalogs -> Schemas -> Tables with arrow keys.
-- **Pure REST API**: No heavy ODBC/JDBC drivers. Uses `Statement Execution` API for data queries.
+- **Pure REST API**: Uses `Statement Execution` API for data queries. No heavy ODBC/JDBC drivers required.
 - **Warehouse Selection**: 
   - Automatically discovers your best SQL Warehouse.
   - Supports **Serverless** detection (⚡).
@@ -93,9 +93,9 @@ If you need to switch workspaces or users:
 - Ensure your user has `Can Use` permission on at least one SQL Warehouse.
 - Ensure you are in the correct workspace.
 
-**"Invalid DSN" or Connection Errors**
-- We removed the ODBC driver dependence! If you see this, ensure you are using the latest build (`go build`).
-- Try **Reset Credentials** to re-discover the correct HTTP Path/Warehouse ID.
+- **"Invalid DSN" or Connection Errors**:
+    - This tool uses the REST API and does not require ODBC drivers. If you see connection errors, ensure your Host/Token are correct.
+    - Try **Reset Credentials** to re-discover the correct HTTP Path/Warehouse ID.
 
 **"403 Forbidden"**
 - Your token might be expired. Use **Reset Credentials** to generate a new one.
