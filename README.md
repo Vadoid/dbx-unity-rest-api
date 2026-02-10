@@ -85,5 +85,4 @@ If you need to switch workspaces or users:
 **"403 Forbidden"**
 - Your token might be expired. Use **Reset Credentials** to generate a new one.
 
----
-*Built with ❤️ for Databricks Users.*
+
