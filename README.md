@@ -93,9 +93,7 @@ If you need to switch workspaces or users:
 - Ensure your user has `Can Use` permission on at least one SQL Warehouse.
 - Ensure you are in the correct workspace.
 
-- **"Invalid DSN" or Connection Errors**:
-    - This tool uses the REST API and does not require ODBC drivers. If you see connection errors, ensure your Host/Token are correct.
-    - Try **Reset Credentials** to re-discover the correct HTTP Path/Warehouse ID.
+
 
 **"403 Forbidden"**
 - Your token might be expired. Use **Reset Credentials** to generate a new one.
