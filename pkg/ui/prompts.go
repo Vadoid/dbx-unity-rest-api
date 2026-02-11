@@ -9,9 +9,11 @@ import (
 // SelectPrompt shows a list of items and returns the selected item and its index.
 func SelectPrompt(label string, items []string) (int, string, error) {
 	prompt := promptui.Select{
-		Label: label,
-		Items: items,
-		Size:  10,
+		Label:        label,
+		Items:        items,
+		Size:         10,
+		HideSelected: true,
+		HideHelp:     true,
 		Searcher: func(input string, index int) bool {
 			// Simple robust search
 			if index < 0 || index >= len(items) {
